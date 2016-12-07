@@ -91,7 +91,7 @@ versionStr = "bamresize v2.3"
 uStr = \
 """Code contributions by Avenger_teambg and Sam.
 
-python.exe bamresize.py [OPTIONS] filename.bam [filename2.bam...]
+bamresize.exe [OPTIONS] filename.bam [filename2.bam...]
 Resizes all the frames in filename.bam, creating a new file called filenamer.bam.
 The filename(s) to convert can use wildcards.
 
@@ -109,11 +109,11 @@ Options:
     Print this message.
 
 examples:
-python.exe bamresize.py MNO3A1.bam
+bamresize.exe MNO3A1.bam
  Resizes all the frames in MNO3A1.bam by 75% and creates MNO3A1r.bam
 
-python.exe bamresize.py -p 50 -q 150 c:\extractedBams\*.bam
- Resizes all frame widths by 50% and all frame heights by 150% for all .bam 
+bamresize.exe -p 50 -q 150 c:\extractedBams\*.bam
+ Resizes all frame widths by 50% and all frame heights by 150% for all .bam
  files in the \extractedBams dir.
 """
 
