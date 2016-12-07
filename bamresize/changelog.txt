@@ -1,0 +1,14 @@
+Version History:
+
+v1.5 (17 February 2003)
+     * Latest release on PPG
+
+v2.1 (13 October 2013)
+     * Implemented Avenger_teambg's end main() and resizeFrame() fixes from <http://forums.pocketplane.net/index.php/topic,28376.0.html>
+     * Fixed a bug in compressFrame() that caused pixel row misalignment in BAM frames after resize under some circumstances.
+
+v2.2 (11 January 2014)
+     * Width and height resizing is decoupled to allow specifying separate values.  Use "-p" to scale width and "-q" to scale height. Whichever ones not specified will default to 75%.
+
+v2.3 (19 January 2014)
+     * Value of -q (height) now defaults to the -p (width) value (instead of 75%) if it is otherwise unspecified.
