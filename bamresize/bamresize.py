@@ -86,17 +86,23 @@ debugging = false
 
 # ===========================================================================
 
-versionStr = "Version: $Revision: 1.5 $"
+versionStr = "bamresize v2.2"
 
 uStr = \
-"""python bamresize.py [OPTIONS] filename.bam [filename2.bam...]
+"""Code contributions by Avenger_teambg and Sam.
+
+python bamresize.py [OPTIONS] filename.bam [filename2.bam...]
 Resizes all the frames in filename.bam, creating a new file called flenamer.bam.
 The filename(s) to convert can use wildcards.
 
 Options:
  '-p PERCENT'
- '--percent PERCENT'
-    Frames are resized by PERCENT percent.
+ '--percentw PERCENT'
+    Frame widths are resized by PERCENT percent.
+    Default is 75
+ '-q PERCENT'
+ '--percenth PERCENT'
+    Frame heights are resized by PERCENT percent.
     Default is 75
  '-h'
  '--help'
@@ -105,8 +111,10 @@ Options:
 examples:
 python bamresize.py MNO3A1.bam
  Resizes all the frames in MNO3A1.bam by 75% and creates MNO3A1r.bam
-python bamresize.py -p 50 c:\extractedBams\*.bam
- Resizes all frames in all the .bam files in the \extractedBams dir by 50%.
+
+python bamresize.py -p 50 -q 150 c:\extractedBams\*.bam
+ Resizes all frame widths by 50% and all frame heights by 150% for all .bam 
+ files in the \extractedBams dir.
 """
 
 def printUsage(versionStr, usageStr, pauseF=true):
@@ -123,7 +131,7 @@ def printUsage(versionStr, usageStr, pauseF=true):
 	print usageStr
 
 def usage():
-    printUsage (versionStr, uStr, true)
+    printUsage (versionStr, uStr, false)
 
 # ===========================================================================
 
@@ -441,26 +449,26 @@ class BamFile (InfinityBaseFile):
 	    PILPalette.append(b)
 	return PILPalette
 
-    def resizeFrame (self, percent, PILPalette,
+    def resizeFrame (self, percentw, percenth, PILPalette,
                      width, height, data, centerX, centerY):
         im = Image.fromstring("P", (width, height), data)
         im.putpalette(PILPalette)
         if width > 1 and height > 1:
-            width = width * percent / 100
-            height = height * percent / 100
+            width = width * percentw / 100
+            height = height * percenth / 100
             im2 = im.resize ((width, height))
             data = im2.tostring()
-            centerX = centerX * percent / 100
-            centerY = centerY * percent / 100
+            centerX = centerX * percentw / 100
+            centerY = centerY * percenth / 100
         return width, height, data, centerX, centerY
     
-    def resizeFrames (self, percent):
+    def resizeFrames (self, percentw, percenth):
 	PILPalette = self.getPILPalette()
 	self.getFrames()
 	for i in range (self.nFrames):
 	    width, height, data, centerX, centerY, isRLE = self.frames[i]
 	    width, height, data, centerX, centerY = \
-		   self.resizeFrame (percent, PILPalette,
+		   self.resizeFrame (percentw, percenth, PILPalette,
 				     width, height, data, centerX, centerY)
 	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
 
@@ -618,12 +626,13 @@ def main ():
     #filename = "MNO3A1.bam"
     #filename = os.path.join(baseDir, filename)
 
-    percent = 75
+    percentw = 75
+    percenth = 75
     
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-				   "hp:",
-				   ["help", "percent="]
+				   "hp:q:",
+				   ["help", "percentw=", "percenth="]
 				   )
 	
     except getopt.GetoptError, e:
@@ -636,9 +645,11 @@ def main ():
         if o in ("-h", "--help"):
             usage()
             sys.exit()
-        if o in ("-p", "--percent"):
-	    percent = int(a)
-	    
+        if o in ("-p", "--percentw"):
+	    percentw = int(a)
+        if o in ("-q", "--percenth"):
+	    percenth = int(a)
+
     if len(args) < 1:
 	usage()
         sys.exit(2)
@@ -655,7 +666,7 @@ def main ():
     for filename in filenames:
 	print "Processing %s ..." % filename
 	bFile = BamFile (filename)
-	bFile.resizeFrames (percent)
+	bFile.resizeFrames (percentw, percenth)
 
 	path, ext = os.path.splitext(filename)
 	outputFilename = path + "r" + ext
