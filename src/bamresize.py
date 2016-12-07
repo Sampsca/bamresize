@@ -86,7 +86,7 @@ debugging = false
 
 # ===========================================================================
 
-versionStr = "bamresize v2.4"
+versionStr = "bamresize v2.5"
 
 uStr = \
 """Code contributions by Avenger_teambg and Sam.
@@ -104,9 +104,6 @@ Options:
  '--percenth PERCENT'
     Frame heights are resized by PERCENT percent.
     Default is the value for -p (if specified), otherwise it is 75
- '-n'
- '--norecalcoffset'
-    Do not recalculate (scale) frame offsets with resize.
  '-x NUMBER'
  '--modxoffset NUMBER'
     Modify (either increment or decrement) x offsets by NUMBER.
@@ -119,10 +116,17 @@ Options:
  '--setxoffset NUMBER'
     Set x offsets to NUMBER.
     Default is NONE
- '-t NUMBER'
+ '-v NUMBER'
  '--setyoffset NUMBER'
     Set y offsets to NUMBER.
     Default is NONE
+ '-u'
+ '--unify'
+    Pad frames before resize to make dimensions and offsets uniform.
+    This eliminates frame 'twitching' when resized.
+ '-t'
+ '--trim'
+    Trim transparent padding from frame after resize. (opposite of --unify)
  '-h'
  '--help'
     Print this message.
@@ -369,6 +373,8 @@ class BamFile (InfinityBaseFile):
 		      (entryIndex, len(data), width*height)
 	else:
 	    data = self.read(nBytes)
+	
+	
 
 	return width, height, data, centerX, centerY, isRLE
     
@@ -477,7 +483,7 @@ class BamFile (InfinityBaseFile):
 	return PILPalette
 
     def resizeFrame (self, percentw, percenth, PILPalette,
-                     width, height, data, centerX, centerY, norecalcoffset, modxoffset, modyoffset, setxoffset, setyoffset):
+                     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim):
         im = Image.fromstring("P", (width, height), data)
         im.putpalette(PILPalette)
         if width > 1 and height > 1:
@@ -485,28 +491,190 @@ class BamFile (InfinityBaseFile):
             height = height * percenth / 100
             im2 = im.resize ((width, height))
             data = im2.tostring()
+            centerX = centerX * percentw / 100
+            centerY = centerY * percenth / 100
+            if trim == 1:
+                width, height, data, centerX, centerY = self.trimFrame(width, height, data, centerX, centerY, self.compressedColorIndex)
             if setxoffset != "nan":
                 centerX = setxoffset
             if setyoffset != "nan":
                 centerY = setyoffset
-            if norecalcoffset == 1:
-                centerX = centerX + modxoffset
-                centerY = centerY + modyoffset
-            else:
-                centerX = centerX * percentw / 100 + modxoffset
-                centerY = centerY * percenth / 100 + modyoffset
+            centerX += modxoffset
+            centerY += modyoffset
         return width, height, data, centerX, centerY
     
-    def resizeFrames (self, percentw, percenth, norecalcoffset, modxoffset, modyoffset, setxoffset, setyoffset):
+    def resizeFrames (self, percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim):
+	if unify == 1:
+	    self.unify()
 	PILPalette = self.getPILPalette()
 	self.getFrames()
 	for i in range (self.nFrames):
 	    width, height, data, centerX, centerY, isRLE = self.frames[i]
 	    width, height, data, centerX, centerY = \
 		   self.resizeFrame (percentw, percenth, PILPalette,
-				     width, height, data, centerX, centerY, norecalcoffset, modxoffset, modyoffset, setxoffset, setyoffset)
+				     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim)
 	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
+	
+    def unify (self):
+	MaxXCoord = 0
+	MaxYCoord = 0
+	self.getFrames()
+	for i in range (self.nFrames):
+	    width, height, data, centerX, centerY, isRLE = self.frames[i]
+	    if centerX > MaxXCoord:
+	        MaxXCoord = centerX
+	    if centerY > MaxYCoord:
+	        MaxYCoord = centerY
+	InsertLeft = 0
+	InsertTop = 0
+	MaxWidth = 0
+	MaxHeight = 0
+	for i in range (self.nFrames):
+	    width, height, data, centerX, centerY, isRLE = self.frames[i]
+	    InsertLeft = MaxXCoord - centerX
+	    InsertTop = MaxYCoord - centerY
+	    data = self.insertRC(data, self.compressedColorIndex, InsertTop, 0, InsertLeft, 0, width, height)
+	    width = width + InsertLeft
+	    height = height + InsertTop
+	    if width > MaxWidth:
+	        MaxWidth = width
+	    if height > MaxHeight:
+	        MaxHeight = height
+	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
+	InsertRight = 0
+	InsertBottom = 0
+	for i in range (self.nFrames):
+	    width, height, data, centerX, centerY, isRLE = self.frames[i]
+	    InsertRight = MaxWidth - width
+	    InsertBottom = MaxHeight - height
+	    data = self.insertRC(data, self.compressedColorIndex, 0, InsertBottom, 0, InsertRight, width, height)
+	    width = MaxWidth
+	    height = MaxHeight
+	    centerX = MaxXCoord
+	    centerY = MaxYCoord
+	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
+	    #print "%3d, %3d, %3d, %3d, %3d, %3d, %3d, %3d" % (width, InsertLeft, InsertRight, height, InsertTop, InsertBottom, centerX, centerY)
+	
+    def insertRC (self, data, compressedColorIndex, top, bottom, left, right, width, height):
+	sbuf = cStringIO.StringIO()
+	compressedChar = chr(compressedColorIndex)
+	if top > 0:
+		insertCount = width * top
+		while insertCount > 0:
+			sbuf.write(compressedChar)
+			insertCount -= 1
+		height += top
+		sbuf.write(data)
+		data = sbuf.getvalue()
+		sbuf = cStringIO.StringIO()
+	if bottom > 0:
+		sbuf.write(data)
+		insertCount = width * bottom
+		while insertCount > 0:
+			sbuf.write(compressedChar)
+			insertCount -= 1
+		height += bottom
+		data = sbuf.getvalue()
+		sbuf = cStringIO.StringIO()
+	if left > 0:
+		insertCount = left
+		insertRow = 0
+		insertIndex = 1
+		for char in data:
+			if insertIndex == insertRow * width + 1:
+				while insertCount > 0:
+					sbuf.write(compressedChar)
+					insertCount -= 1
+				insertCount = left
+				insertRow += 1
+			sbuf.write(char)
+			insertIndex += 1
+		data = sbuf.getvalue()
+		sbuf = cStringIO.StringIO()
+	if right > 0:
+		insertCount = right
+		insertRow = 1
+		insertIndex = 1
+		for char in data:
+			sbuf.write(char)
+			if insertIndex == insertRow * width:
+				while insertCount > 0:
+					sbuf.write(compressedChar)
+					insertCount -= 1
+				insertCount = right
+				insertRow += 1
+			insertIndex += 1
+		data = sbuf.getvalue()
+		sbuf = cStringIO.StringIO()
+	return data
 
+    def trimFrame (self, width, height, data, centerX, centerY, compressedColorIndex):
+	compressedChar = chr(compressedColorIndex)
+	PILPalette = self.getPILPalette()
+	temp = 0
+	# Top
+	width, height, data, centerX, centerY = self.trim(width, height, data, centerX, centerY, compressedChar)
+	# Right
+	im = Image.fromstring("P", (width, height), data)
+	im.putpalette(PILPalette)
+	im2 = im.transpose (2)
+	data = im2.tostring()
+	height, width, data, temp, temp = self.trim(height, width, data, centerX, centerY, compressedChar)
+	# Bottom
+	im = Image.fromstring("P", (height, width), data)
+	im.putpalette(PILPalette)
+	im2 = im.transpose (2)
+	data = im2.tostring()
+	width, height, data, temp, temp = self.trim(width, height, data, centerX, centerY, compressedChar)
+	#Left
+	im = Image.fromstring("P", (width, height), data)
+	im.putpalette(PILPalette)
+	im2 = im.transpose (2)
+	data = im2.tostring()
+	height, width, data, centerY, centerX = self.trim(height, width, data, centerY, centerX, compressedChar)
+	# Back to Top
+	im = Image.fromstring("P", (height, width), data)
+	im.putpalette(PILPalette)
+	im2 = im.transpose (2)
+	data = im2.tostring()
+	#print len(data)
+	return width, height, data, centerX, centerY
+	
+    def trim (self, width, height, data, centerX, centerY, compressedChar):
+	# Trim from what is now the Top:
+	sbuf = cStringIO.StringIO()
+	sbufRow = cStringIO.StringIO()
+	transCount = 0
+	trimIndex = 0
+	trimSkip = 0
+	for char in data:
+		if trimSkip == 1:
+			sbuf.write(char)
+			continue
+		if char == compressedChar:
+			transCount += 1
+		sbufRow.write(char)
+		trimIndex += 1
+		if trimIndex == width:
+			if transCount == width:
+				height -= 1
+				centerY -= 1
+				sbufRow = cStringIO.StringIO()
+			else:
+				trimSkip = 1
+				sbuf.write(sbufRow.getvalue())
+			transCount = 0
+			trimIndex = 0
+	data = sbuf.getvalue()
+	if len(data) < 1:
+		sbuf = cStringIO.StringIO()
+		sbuf.write(compressedChar)
+		data = sbuf.getvalue()
+		width = 1
+		height = 1
+		centerY += 1
+	return width, height, data, centerX, centerY
+	
     def generateFrames (self):
 	sbuf = cStringIO.StringIO()
 
@@ -663,16 +831,17 @@ def main ():
 
     percentw = 75
     percenth = 0
-    norecalcoffset = 0
     modxoffset = 0
     modyoffset = 0
     setxoffset = 'nan'
     setyoffset = 'nan'
+    unify = 0
+    trim = 0
     
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-				   "hp:q:nx:y:s:t:",
-				   ["help", "percentw=", "percenth=", "norecalcoffset", "modxoffset", "modyoffset", "setxoffset", "setyoffset"]
+				   "hp:q:x:y:s:v:ut",
+				   ["help", "percentw=", "percenth=", "modxoffset", "modyoffset", "setxoffset", "setyoffset", "unify", "trim"]
 				   )
 	
     except getopt.GetoptError, e:
@@ -685,8 +854,6 @@ def main ():
         if o in ("-h", "--help"):
             usage()
             sys.exit()
-        if o in ("-n", "--norecalcoffset"):
-            norecalcoffset = 1
         if o in ("-p", "--percentw"):
             percentw = int(a)
         if percenth == 0:
@@ -699,8 +866,12 @@ def main ():
             modyoffset = int(a)
         if o in ("-s", "--setxoffset"):
             setxoffset = int(a)
-        if o in ("-t", "--setyoffset"):
+        if o in ("-v", "--setyoffset"):
             setyoffset = int(a)
+        if o in ("-u", "--unify"):
+            unify = 1
+        if o in ("-t", "--trim"):
+            trim = 1
     if percenth == 0:
 	percenth = 75
     #print percentw
@@ -723,7 +894,7 @@ def main ():
     for filename in filenames:
 	print "Processing %s ..." % filename
 	bFile = BamFile (filename)
-	bFile.resizeFrames (percentw, percenth, norecalcoffset, modxoffset, modyoffset, setxoffset, setyoffset)
+	bFile.resizeFrames (percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim)
 
 	path, ext = os.path.splitext(filename)
 	outputFilename = path + "r" + ext

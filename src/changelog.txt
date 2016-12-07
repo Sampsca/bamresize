@@ -19,3 +19,9 @@ v2.4 (18 March 2015)
      * Added option to modify (either increment or decrement) x and y offsets by a positive or negative number. ['-x NUMBER' or '--modxoffset NUMBER'] and ['-y NUMBER' or '--modyoffset NUMBER']
      * Added option to set x and y offsets to a positive or negative number.  ['-s NUMBER' or '--setxoffset NUMBER'] and ['-t NUMBER' or '--setyoffset NUMBER']
      * Compiled into self-contained EXE.
+
+v2.5 (16 June 2015)
+     * Added option to pad the frames (with transparent pixels) before resizing them to ensure the resized dimensions and offsets are uniform.  This eliminates frame 'twitching' when resized.  ['-u' or '--unify']
+     * Added option to trim the padding (transparent pixels) from the frames after resizing them.  This is the opposite of --unify.  ['-t' or '--trim']
+     * Removed option to not recalculate (scale) frame offsets with resize. ['-n' or '--norecalcoffset']
+     * Modified the option to set the y offset to a positive or negative number to use ['-v NUMBER' or '--setyoffset NUMBER'] instead of ['-t NUMBER' or '--setyoffset NUMBER']
