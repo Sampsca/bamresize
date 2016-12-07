@@ -12,3 +12,10 @@ v2.2 (11 January 2014)
 
 v2.3 (19 January 2014)
      * Value of -q (height) now defaults to the -p (width) value (instead of 75%) if it is otherwise unspecified.
+
+v2.4 (18 March 2015)
+     * Fixed a bug in the frame offset calculations of negative numbers.
+     * Added option to not recalculate (scale) frame offsets with resize. ['-n' or '--norecalcoffset']
+     * Added option to modify (either increment or decrement) x and y offsets by a positive or negative number. ['-x NUMBER' or '--modxoffset NUMBER'] and ['-y NUMBER' or '--modyoffset NUMBER']
+     * Added option to set x and y offsets to a positive or negative number.  ['-s NUMBER' or '--setxoffset NUMBER'] and ['-t NUMBER' or '--setyoffset NUMBER']
+     * Compiled into self-contained EXE.

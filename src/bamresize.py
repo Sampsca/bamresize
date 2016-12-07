@@ -86,13 +86,13 @@ debugging = false
 
 # ===========================================================================
 
-versionStr = "bamresize v2.3"
+versionStr = "bamresize v2.4"
 
 uStr = \
 """Code contributions by Avenger_teambg and Sam.
 
-bamresize.exe [OPTIONS] filename.bam [filename2.bam...]
-Resizes all the frames in filename.bam, creating a new file called filenamer.bam.
+bamresize [OPTIONS] filename.bam [filename2.bam...]
+Resizes all frames in filename.bam, creating a new file called filenamer.bam.
 The filename(s) to convert can use wildcards.
 
 Options:
@@ -104,17 +104,40 @@ Options:
  '--percenth PERCENT'
     Frame heights are resized by PERCENT percent.
     Default is the value for -p (if specified), otherwise it is 75
+ '-n'
+ '--norecalcoffset'
+    Do not recalculate (scale) frame offsets with resize.
+ '-x NUMBER'
+ '--modxoffset NUMBER'
+    Modify (either increment or decrement) x offsets by NUMBER.
+    Default is 0
+ '-y NUMBER'
+ '--modyoffset NUMBER'
+    Modify (either increment or decrement) y offsets by NUMBER.
+    Default is 0
+ '-s NUMBER'
+ '--setxoffset NUMBER'
+    Set x offsets to NUMBER.
+    Default is NONE
+ '-t NUMBER'
+ '--setyoffset NUMBER'
+    Set y offsets to NUMBER.
+    Default is NONE
  '-h'
  '--help'
     Print this message.
 
-examples:
-bamresize.exe MNO3A1.bam
+Examples:
+bamresize MNO3A1.bam
  Resizes all the frames in MNO3A1.bam by 75% and creates MNO3A1r.bam
 
-bamresize.exe -p 50 -q 150 c:\extractedBams\*.bam
+bamresize -p 50 -q 150 c:\extractedBams\*.bam
  Resizes all frame widths by 50% and all frame heights by 150% for all .bam
  files in the \extractedBams dir.
+
+bamresize -p 100 -s -10 -y 15 ABATG1.bam
+ Sets all x offsets to -10 and increments all y offsets by 15 without resizing 
+ frames.
 """
 
 def printUsage(versionStr, usageStr, pauseF=true):
@@ -308,7 +331,11 @@ class BamFile (InfinityBaseFile):
 	width = self.getShort()
 	height = self.getShort()
 	centerX = self.getShort()
+	if centerX > 32767:
+		centerX = centerX-65536
 	centerY = self.getShort()
+	if centerY > 32767:
+		centerY = centerY-65536
 	temp = self.getLong()
 	frameOffset = temp & 0x7FFFFFFF
 	isRLE =  not (temp & 0x80000000) > 0
@@ -450,7 +477,7 @@ class BamFile (InfinityBaseFile):
 	return PILPalette
 
     def resizeFrame (self, percentw, percenth, PILPalette,
-                     width, height, data, centerX, centerY):
+                     width, height, data, centerX, centerY, norecalcoffset, modxoffset, modyoffset, setxoffset, setyoffset):
         im = Image.fromstring("P", (width, height), data)
         im.putpalette(PILPalette)
         if width > 1 and height > 1:
@@ -458,18 +485,26 @@ class BamFile (InfinityBaseFile):
             height = height * percenth / 100
             im2 = im.resize ((width, height))
             data = im2.tostring()
-            centerX = centerX * percentw / 100
-            centerY = centerY * percenth / 100
+            if setxoffset != "nan":
+                centerX = setxoffset
+            if setyoffset != "nan":
+                centerY = setyoffset
+            if norecalcoffset == 1:
+                centerX = centerX + modxoffset
+                centerY = centerY + modyoffset
+            else:
+                centerX = centerX * percentw / 100 + modxoffset
+                centerY = centerY * percenth / 100 + modyoffset
         return width, height, data, centerX, centerY
     
-    def resizeFrames (self, percentw, percenth):
+    def resizeFrames (self, percentw, percenth, norecalcoffset, modxoffset, modyoffset, setxoffset, setyoffset):
 	PILPalette = self.getPILPalette()
 	self.getFrames()
 	for i in range (self.nFrames):
 	    width, height, data, centerX, centerY, isRLE = self.frames[i]
 	    width, height, data, centerX, centerY = \
 		   self.resizeFrame (percentw, percenth, PILPalette,
-				     width, height, data, centerX, centerY)
+				     width, height, data, centerX, centerY, norecalcoffset, modxoffset, modyoffset, setxoffset, setyoffset)
 	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
 
     def generateFrames (self):
@@ -628,11 +663,16 @@ def main ():
 
     percentw = 75
     percenth = 0
+    norecalcoffset = 0
+    modxoffset = 0
+    modyoffset = 0
+    setxoffset = 'nan'
+    setyoffset = 'nan'
     
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-				   "hp:q:",
-				   ["help", "percentw=", "percenth="]
+				   "hp:q:nx:y:s:t:",
+				   ["help", "percentw=", "percenth=", "norecalcoffset", "modxoffset", "modyoffset", "setxoffset", "setyoffset"]
 				   )
 	
     except getopt.GetoptError, e:
@@ -645,12 +685,22 @@ def main ():
         if o in ("-h", "--help"):
             usage()
             sys.exit()
+        if o in ("-n", "--norecalcoffset"):
+            norecalcoffset = 1
         if o in ("-p", "--percentw"):
-	    percentw = int(a)
+            percentw = int(a)
         if percenth == 0:
-	    percenth = int(a)
+            percenth = int(a)
         if o in ("-q", "--percenth"):
-	    percenth = int(a)
+            percenth = int(a)
+        if o in ("-x", "--modxoffset"):
+            modxoffset = int(a)
+        if o in ("-y", "--modyoffset"):
+            modyoffset = int(a)
+        if o in ("-s", "--setxoffset"):
+            setxoffset = int(a)
+        if o in ("-t", "--setyoffset"):
+            setyoffset = int(a)
     if percenth == 0:
 	percenth = 75
     #print percentw
@@ -673,7 +723,7 @@ def main ():
     for filename in filenames:
 	print "Processing %s ..." % filename
 	bFile = BamFile (filename)
-	bFile.resizeFrames (percentw, percenth)
+	bFile.resizeFrames (percentw, percenth, norecalcoffset, modxoffset, modyoffset, setxoffset, setyoffset)
 
 	path, ext = os.path.splitext(filename)
 	outputFilename = path + "r" + ext
