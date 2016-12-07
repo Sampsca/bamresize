@@ -26,6 +26,15 @@ v2.5 (16 June 2015)
      * Removed option to not recalculate (scale) frame offsets with resize. ['-n' or '--norecalcoffset']
      * Modified the option to set the y offset to a positive or negative number to use ['-v NUMBER' or '--setyoffset NUMBER'] instead of ['-t NUMBER' or '--setyoffset NUMBER']
 
-v2.6 (00 June 2015)
+v2.6 (20 June 2015)
      * Improved handling of very small frame dimensions (<= 1 px).
      * Added undocumented ['-d' or '--debug'] option to print some debug information to console.
+
+v2.7 (22 June 2015)
+     * Updated Python to v2.1.3, updated PyWin32 to Build 151, and upgraded the Python Imaging Library to v1.1.5.
+     * Included installers for the above plus PyInstaller for posterity.
+     * Included the entire PIL with BAM Resizer.
+     * Added option to export the frames as BMPs. ['-e' or '--export']
+     * Fixed several bugs in how input Options were processed.
+     * Unify and Trim options are now ON by default and require a second parameter when specified: ['-u VALUE' or '--unify VALUE'] and ['-t VALUE' or '--trim VALUE']
+     * Unify can now pad the frames until they are square by setting the option's value to 2.  ['-u 2' or '--unify 2']

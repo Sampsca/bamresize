@@ -76,7 +76,8 @@ import time
 import zlib
 from types import FileType
 
-import Image
+#import Image
+from PIL import Image
 
 #import hexdumper
 
@@ -85,7 +86,7 @@ false = 0
 
 # ===========================================================================
 
-versionStr = "bamresize v2.6"
+versionStr = "bamresize v2.7"
 
 uStr = \
 """Code contributions by Avenger_teambg and Sam.
@@ -119,13 +120,18 @@ Options:
  '--setyoffset NUMBER'
     Set y offsets to NUMBER.
     Default is NONE
- '-u'
- '--unify'
+ '-u VALUE'
+ '--unify VALUE'
     Pad frames before resize to make dimensions and offsets uniform.
     This eliminates frame 'twitching' when resized.
- '-t'
- '--trim'
+    For VALUE, 0 is OFF, 1 is ON, and 2 is square.  Default is 1.
+ '-t VALUE'
+ '--trim VALUE'
     Trim transparent padding from frame after resize. (opposite of --unify)
+    For VALUE, 0 is OFF and 1 is ON.  Default is 1.
+ '-e'
+ '--export'
+    Export frames as BMPs.
  '-h'
  '--help'
     Print this message.
@@ -482,7 +488,7 @@ class BamFile (InfinityBaseFile):
 	return PILPalette
 
     def resizeFrame (self, i, percentw, percenth, PILPalette,
-                     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug):
+                     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug, outputFilename, export):
         if width > 0 and height > 0:
             im = Image.fromstring("P", (width, height), data)
             im.putpalette(PILPalette)
@@ -505,15 +511,17 @@ class BamFile (InfinityBaseFile):
                 centerY = setyoffset
             centerX += modxoffset
             centerY += modyoffset
+            if export:
+                self.exportFrame (i, width, height, data, PILPalette, outputFilename)
         else:
-            if trim ==1:
+            if trim == 1:
                 self.trimDATA.append (list([i, width, 0, 0, height, 0, 0, centerX, centerY]))
         return width, height, data, centerX, centerY
     
-    def resizeFrames (self, percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug):
+    def resizeFrames (self, percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug, outputFilename, export):
 	self.trimDATA = []
-	if unify == 1:
-	    self.unify()
+	if unify > 0:
+	    self.unify(unify)
 	    if debug:
 	        self.dumpUnify()
 	PILPalette = self.getPILPalette()
@@ -522,14 +530,14 @@ class BamFile (InfinityBaseFile):
 	    width, height, data, centerX, centerY, isRLE = self.frames[i]
 	    width, height, data, centerX, centerY = \
 		   self.resizeFrame (i, percentw, percenth, PILPalette,
-				     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug)
+				     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug, outputFilename, export)
 	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
 	if debug:
-	    if trim:
+	    if trim == 1:
 			self.dumpTrim()
 	    self.dumpResizedFrames()
 	
-    def unify (self):
+    def unify (self, square):
 	self.unify = []
 	temp = []
 	MaxXCoord = 0
@@ -561,6 +569,11 @@ class BamFile (InfinityBaseFile):
 	        MaxHeight = height
 	    temp.append (list([InsertLeft, InsertTop]))
 	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
+	if square == 2:
+	    if MaxWidth > MaxHeight:
+	        MaxHeight = MaxWidth
+	    if MaxHeight > MaxWidth:
+	        MaxWidth = MaxHeight
 	for i in range (self.nFrames):
 	    InsertRight = 0
 	    InsertBottom = 0
@@ -707,6 +720,18 @@ class BamFile (InfinityBaseFile):
 		height = 1
 		centerY = 0
 	return width, height, data, centerX, centerY
+	
+    def exportFrame (self, i, width, height, data, PILPalette, outputFilename):
+	im = Image.fromstring("P", (width, height), data)
+	im.putpalette(PILPalette)
+	path, file = os.path.split(outputFilename)
+	name, ext = os.path.splitext(file)
+	path = os.path.join(path, name)
+	if not os.path.exists(path):
+		os.makedirs(path)
+	name = "%s%s%04d%s" % (name,"_", i,".bmp")
+	fp = os.path.join(path, name)
+	im.save(fp)
 	
     def generateFrames (self):
 	sbuf = cStringIO.StringIO()
@@ -898,14 +923,15 @@ def main ():
     modyoffset = 0
     setxoffset = 'nan'
     setyoffset = 'nan'
-    unify = 0
-    trim = 0
+    unify = 1
+    trim = 1
     debug = 0
+    export = 0
     
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-				   "hp:q:x:y:s:v:utd",
-				   ["help", "percentw=", "percenth=", "modxoffset", "modyoffset", "setxoffset", "setyoffset", "unify", "trim", "debug"]
+				   "hp:q:x:y:s:v:u:t:de",
+				   ["help", "percentw=", "percenth=", "modxoffset=", "modyoffset=", "setxoffset=", "setyoffset=", "unify=", "trim=", "debug", "export"]
 				   )
 	
     except getopt.GetoptError, e:
@@ -920,8 +946,6 @@ def main ():
             sys.exit()
         if o in ("-p", "--percentw"):
             percentw = int(a)
-        if percenth == 0:
-            percenth = int(a)
         if o in ("-q", "--percenth"):
             percenth = int(a)
         if o in ("-x", "--modxoffset"):
@@ -933,13 +957,15 @@ def main ():
         if o in ("-v", "--setyoffset"):
             setyoffset = int(a)
         if o in ("-u", "--unify"):
-            unify = 1
+            unify = int(a)
         if o in ("-t", "--trim"):
-            trim = 1
+            trim = int(a)
         if o in ("-d", "--debug"):
             debug = 1
+        if o in ("-e", "--export"):
+            export = 1
     if percenth == 0:
-	percenth = 75
+        percenth = percentw
     #print percentw
     #print percenth
 
@@ -965,9 +991,9 @@ def main ():
 			bFile.dumpFrames()
 			bFile.dumpCycles()
 			bFile.dumpPalette()
-		bFile.resizeFrames (percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug)
 		path, ext = os.path.splitext(filename)
 		outputFilename = path + "r" + ext
+		bFile.resizeFrames (percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug, outputFilename, export)
 		data = bFile.getData()
 		f = open(outputFilename, "wb")
 		f.write(data)
