@@ -82,11 +82,10 @@ import Image
 
 true = 1
 false = 0
-debugging = false
 
 # ===========================================================================
 
-versionStr = "bamresize v2.5"
+versionStr = "bamresize v2.6"
 
 uStr = \
 """Code contributions by Avenger_teambg and Sam.
@@ -319,14 +318,14 @@ class BamFile (InfinityBaseFile):
 	return signature, version
     
     def __str__ (self):
-	s = "%s\n" % self.filename
+	s = "\nStats:\n"
 	s += "# of frames: %d\n" % self.nFrames
 	s += "# of cycles: %d\n" % self.nCycles
 	s += "Compressed color index:    %d\n" % self.compressedColorIndex
-	s += "Frame entries offset:      %08xH\n" % self.frameEntriesOffset
-	s += "Cycle entries offset:      %08xH\n" % self.cycleEntriesOffset
-	s += "Palette offset:            %08xH\n" % self.paletteOffset
-	s += "Frame Lookup Table offset: %08xH\n" % self.frameLookupOffset
+	s += "Frame entries offset:      %d\n" % self.frameEntriesOffset
+	s += "Cycle entries offset:      %d\n" % self.cycleEntriesOffset
+	s += "Palette offset:            %d\n" % self.paletteOffset
+	s += "Frame Lookup Table offset: %d\n" % self.frameLookupOffset
 	return s
 	
     def getFrameEntry (self, entryIndex):
@@ -482,40 +481,57 @@ class BamFile (InfinityBaseFile):
 	    PILPalette.append(b)
 	return PILPalette
 
-    def resizeFrame (self, percentw, percenth, PILPalette,
-                     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim):
-        im = Image.fromstring("P", (width, height), data)
-        im.putpalette(PILPalette)
-        if width > 1 and height > 1:
+    def resizeFrame (self, i, percentw, percenth, PILPalette,
+                     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug):
+        if width > 0 and height > 0:
+            im = Image.fromstring("P", (width, height), data)
+            im.putpalette(PILPalette)
             width = width * percentw / 100
             height = height * percenth / 100
+            if width < 1:
+                width = 1
+            if height < 1:
+                height = 1
             im2 = im.resize ((width, height))
             data = im2.tostring()
             centerX = centerX * percentw / 100
             centerY = centerY * percenth / 100
             if trim == 1:
-                width, height, data, centerX, centerY = self.trimFrame(width, height, data, centerX, centerY, self.compressedColorIndex)
+                width, height, data, centerX, centerY, top, right, bottom, left = self.trimFrame(width, height, data, centerX, centerY, self.compressedColorIndex)
+                self.trimDATA.append (list([i, width, left, right, height, top, bottom, centerX, centerY]))
             if setxoffset != "nan":
                 centerX = setxoffset
             if setyoffset != "nan":
                 centerY = setyoffset
             centerX += modxoffset
             centerY += modyoffset
+        else:
+            if trim ==1:
+                self.trimDATA.append (list([i, width, 0, 0, height, 0, 0, centerX, centerY]))
         return width, height, data, centerX, centerY
     
-    def resizeFrames (self, percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim):
+    def resizeFrames (self, percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug):
+	self.trimDATA = []
 	if unify == 1:
 	    self.unify()
+	    if debug:
+	        self.dumpUnify()
 	PILPalette = self.getPILPalette()
 	self.getFrames()
 	for i in range (self.nFrames):
 	    width, height, data, centerX, centerY, isRLE = self.frames[i]
 	    width, height, data, centerX, centerY = \
-		   self.resizeFrame (percentw, percenth, PILPalette,
-				     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim)
+		   self.resizeFrame (i, percentw, percenth, PILPalette,
+				     width, height, data, centerX, centerY, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug)
 	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
+	if debug:
+	    if trim:
+			self.dumpTrim()
+	    self.dumpResizedFrames()
 	
     def unify (self):
+	self.unify = []
+	temp = []
 	MaxXCoord = 0
 	MaxYCoord = 0
 	self.getFrames()
@@ -525,12 +541,15 @@ class BamFile (InfinityBaseFile):
 	        MaxXCoord = centerX
 	    if centerY > MaxYCoord:
 	        MaxYCoord = centerY
-	InsertLeft = 0
-	InsertTop = 0
 	MaxWidth = 0
 	MaxHeight = 0
 	for i in range (self.nFrames):
+	    InsertLeft = 0
+	    InsertTop = 0
 	    width, height, data, centerX, centerY, isRLE = self.frames[i]
+	    if width < 1 or height < 1:
+	        temp.append (list([InsertLeft, InsertTop]))
+	        continue
 	    InsertLeft = MaxXCoord - centerX
 	    InsertTop = MaxYCoord - centerY
 	    data = self.insertRC(data, self.compressedColorIndex, InsertTop, 0, InsertLeft, 0, width, height)
@@ -540,11 +559,16 @@ class BamFile (InfinityBaseFile):
 	        MaxWidth = width
 	    if height > MaxHeight:
 	        MaxHeight = height
+	    temp.append (list([InsertLeft, InsertTop]))
 	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
-	InsertRight = 0
-	InsertBottom = 0
 	for i in range (self.nFrames):
+	    InsertRight = 0
+	    InsertBottom = 0
 	    width, height, data, centerX, centerY, isRLE = self.frames[i]
+	    if width < 1 or height < 1:
+	    	InsertLeft, InsertTop = temp[i]
+	    	self.unify.append (list([i, width, InsertLeft, InsertRight, height, InsertTop, InsertBottom, centerX, centerY]))
+	    	continue
 	    InsertRight = MaxWidth - width
 	    InsertBottom = MaxHeight - height
 	    data = self.insertRC(data, self.compressedColorIndex, 0, InsertBottom, 0, InsertRight, width, height)
@@ -553,7 +577,8 @@ class BamFile (InfinityBaseFile):
 	    centerX = MaxXCoord
 	    centerY = MaxYCoord
 	    self.frames[i] = [width, height, data, centerX, centerY, isRLE]
-	    #print "%3d, %3d, %3d, %3d, %3d, %3d, %3d, %3d" % (width, InsertLeft, InsertRight, height, InsertTop, InsertBottom, centerX, centerY)
+	    InsertLeft, InsertTop = temp[i]
+	    self.unify.append (list([i, width, InsertLeft, InsertRight, height, InsertTop, InsertBottom, centerX, centerY]))
 	
     def insertRC (self, data, compressedColorIndex, top, bottom, left, right, width, height):
 	sbuf = cStringIO.StringIO()
@@ -613,32 +638,40 @@ class BamFile (InfinityBaseFile):
 	PILPalette = self.getPILPalette()
 	temp = 0
 	# Top
+	top = height
 	width, height, data, centerX, centerY = self.trim(width, height, data, centerX, centerY, compressedChar)
+	top -= height
 	# Right
 	im = Image.fromstring("P", (width, height), data)
 	im.putpalette(PILPalette)
 	im2 = im.transpose (2)
 	data = im2.tostring()
+	right = width
 	height, width, data, temp, temp = self.trim(height, width, data, centerX, centerY, compressedChar)
+	right -= width
 	# Bottom
 	im = Image.fromstring("P", (height, width), data)
 	im.putpalette(PILPalette)
 	im2 = im.transpose (2)
 	data = im2.tostring()
+	bottom = height
 	width, height, data, temp, temp = self.trim(width, height, data, centerX, centerY, compressedChar)
+	bottom -= height
 	#Left
 	im = Image.fromstring("P", (width, height), data)
 	im.putpalette(PILPalette)
 	im2 = im.transpose (2)
 	data = im2.tostring()
+	left = width
 	height, width, data, centerY, centerX = self.trim(height, width, data, centerY, centerX, compressedChar)
+	left -= width
 	# Back to Top
 	im = Image.fromstring("P", (height, width), data)
 	im.putpalette(PILPalette)
 	im2 = im.transpose (2)
 	data = im2.tostring()
 	#print len(data)
-	return width, height, data, centerX, centerY
+	return width, height, data, centerX, centerY, top, right, bottom, left
 	
     def trim (self, width, height, data, centerX, centerY, compressedChar):
 	# Trim from what is now the Top:
@@ -672,7 +705,7 @@ class BamFile (InfinityBaseFile):
 		data = sbuf.getvalue()
 		width = 1
 		height = 1
-		centerY += 1
+		centerY = 0
 	return width, height, data, centerX, centerY
 	
     def generateFrames (self):
@@ -797,29 +830,59 @@ class BamFile (InfinityBaseFile):
     
     def dumpFrames (self):
 	print "Frames:"
+	print "%6s %4s %11s  (%5s, %6s) , (%7s, %7s)" % ("Frame#", "RLE", "FrameOffset", "Width", "Height", "CenterX", "CenterY")
 	for i in range (self.nFrames):
-	    width, height, centerX, centerY, frameOffset, isRLE = \
-		   self.getFrameEntry(i)
-	    rleStr = ""
-	    if isRLE:
-		rleStr = "RLE"
-	    print "%4d %-3s %08xH (%3d, %3d), (%3d, %3d)" % \
-		  (i, rleStr, frameOffset, width, height, centerX, centerY)
+		width, height, centerX, centerY, frameOffset, isRLE = self.getFrameEntry(i)
+		rleStr = "No"
+		if isRLE:
+			rleStr = "Yes"
+		print "%04d %6s %11d    (%3d, %3d)    ,     (%3d, %3d)" % (i, rleStr, frameOffset, width, height, centerX, centerY)
+	print ""
 
+    def dumpResizedFrames (self):
+	print "Resized Frames:"
+	print "%6s %4s  (%5s, %6s) , (%7s, %7s)" % ("Frame#", "RLE", "Width", "Height", "CenterX", "CenterY")
+	self.getFrames()
+	for i in range (self.nFrames):
+		width, height, data, centerX, centerY, isRLE = self.frames[i]
+		rleStr = "No"
+		if isRLE:
+			rleStr = "Yes"
+		print "%04d %6s    (%3d, %3d)    ,     (%3d, %3d)" % (i, rleStr, width, height, centerX, centerY)
+	print ""
+	
     def dumpCycles (self):
 	lookupSize = self.calcFrameLookupSize()
 	print "Cycles: %d (%d lookup entries)" % (self.nCycles, lookupSize)
+	print "%s %15s" % ("Cycle#", "FramesInCycle")
 	i = 0
 	for cycle in self.cycles:
-	    print i, cycle
+	    print "%03d      %s" % (i, cycle)
 	    i += 1
+	print ""
 	    
     def dumpPalette (self):
 	print "Palette:"
 	palette = self.getPalette()
 	for entry in palette:
 	    print " ", entry
-	    
+	print ""
+	
+    def dumpUnify (self):
+	print "Unify:"
+	print "%s, %s, %s, %s, %s, %s, %s, %s, %s" % ("Frame#", "Width", "InsLeft", "InsRight", "Height", "InsTop", "InsBottom", "CenterX", "CenterY")
+	for i in range (self.nFrames):
+		i, width, InsertLeft, InsertRight, height, InsertTop, InsertBottom, centerX, centerY = self.unify[i]
+		print "   %03d, %5d, %7d, %8d, %6d, %6d, %9d, %7d, %7d" % (i, width, InsertLeft, InsertRight, height, InsertTop, InsertBottom, centerX, centerY)
+	print ""
+	
+    def dumpTrim (self):
+	print "Trim:"
+	print "%s, %s, %s, %s, %s, %s, %s, %s, %s" % ("Frame#", "Width", "TrmLeft", "TrmRight", "Height", "TrmTop", "TrmBottom", "CenterX", "CenterY")
+	for i in range (self.nFrames):
+		i, width, left, right, height, top, bottom, centerX, centerY = self.trimDATA[i]
+		print "   %03d, %5d, %7d, %8d, %6d, %6d, %9d, %7d, %7d" % (i, width, left, right, height, top, bottom, centerX, centerY)
+	print ""
 
 # ===========================================================================
 
@@ -837,11 +900,12 @@ def main ():
     setyoffset = 'nan'
     unify = 0
     trim = 0
+    debug = 0
     
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-				   "hp:q:x:y:s:v:ut",
-				   ["help", "percentw=", "percenth=", "modxoffset", "modyoffset", "setxoffset", "setyoffset", "unify", "trim"]
+				   "hp:q:x:y:s:v:utd",
+				   ["help", "percentw=", "percenth=", "modxoffset", "modyoffset", "setxoffset", "setyoffset", "unify", "trim", "debug"]
 				   )
 	
     except getopt.GetoptError, e:
@@ -872,6 +936,8 @@ def main ():
             unify = 1
         if o in ("-t", "--trim"):
             trim = 1
+        if o in ("-d", "--debug"):
+            debug = 1
     if percenth == 0:
 	percenth = 75
     #print percentw
@@ -892,22 +958,22 @@ def main ():
 	    sys.exit(2)
 
     for filename in filenames:
-	print "Processing %s ..." % filename
-	bFile = BamFile (filename)
-	bFile.resizeFrames (percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim)
-
-	path, ext = os.path.splitext(filename)
-	outputFilename = path + "r" + ext
-	data = bFile.getData()
-	f = open(outputFilename, "wb")
-	f.write(data)
-	f.close()
+		print "Processing %s ..." % filename
+		bFile = BamFile (filename)
+		if debug:
+			print bFile
+			bFile.dumpFrames()
+			bFile.dumpCycles()
+			bFile.dumpPalette()
+		bFile.resizeFrames (percentw, percenth, modxoffset, modyoffset, setxoffset, setyoffset, unify, trim, debug)
+		path, ext = os.path.splitext(filename)
+		outputFilename = path + "r" + ext
+		data = bFile.getData()
+		f = open(outputFilename, "wb")
+		f.write(data)
+		f.close()
 	
-    if false:
-	print bFile
-	bFile.dumpFrames()
-	bFile.dumpCycles()
-	bFile.dumpPalette()
+
     
 if __name__ == "__main__":
     startT = time.clock()

@@ -25,3 +25,7 @@ v2.5 (16 June 2015)
      * Added option to trim the padding (transparent pixels) from the frames after resizing them.  This is the opposite of --unify.  ['-t' or '--trim']
      * Removed option to not recalculate (scale) frame offsets with resize. ['-n' or '--norecalcoffset']
      * Modified the option to set the y offset to a positive or negative number to use ['-v NUMBER' or '--setyoffset NUMBER'] instead of ['-t NUMBER' or '--setyoffset NUMBER']
+
+v2.6 (00 June 2015)
+     * Improved handling of very small frame dimensions (<= 1 px).
+     * Added undocumented ['-d' or '--debug'] option to print some debug information to console.
