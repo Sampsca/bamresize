@@ -38,3 +38,10 @@ v2.7 (22 June 2015)
      * Fixed several bugs in how input Options were processed.
      * Unify and Trim options are now ON by default and require a second parameter when specified: ['-u VALUE' or '--unify VALUE'] and ['-t VALUE' or '--trim VALUE']
      * Unify can now pad the frames until they are square by setting the option's value to 2.  ['-u 2' or '--unify 2']
+
+v2.8 (06 July 2015)
+     * Fixed a bug in how unify was implemented when set to square.
+     * Fixed a bug where frames were being exported before being resized, not after.
+     * Fixed several more bugs in how input Options were processed, resulting in them being applied in a more logical order.
+     * Added option to export frames in the basic format indicated by FORMAT:  ['-e FORMAT' or '--export FORMAT'] Examples include "bmp", "png", and "gif".  Default is do not export.
+     * usage.txt documentation included.

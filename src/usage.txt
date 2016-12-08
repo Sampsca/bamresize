@@ -1,0 +1,91 @@
+A batch file (.bat) contains a series of DOS commands, and is commonly written to automate frequently performed tasks. Instead of typing the same commands over and over, you can simply double-click the batch file.
+
+How to Write a Batch File:
+	1) Open Notepad -- Notepad allows you to create code as a text file and then save it as a batch file when you are done. You can open Notepad by clicking Start -> Programs -> Accessories -> Notepad. You can also enter "notepad" into the Run box (without the quotes).
+	2) Save the file -- Once you have entered your code (see the Examples section below), you can save the file using the Batch filetype. Click File -> Save As. Click the "Save as type" dropdown menu. Select "All files". Enter a name for the program followed by ".bat" (without the quotes).  Make sure the encoding is ANSI and save the file.
+
+An example of the contents of a Batch file to run BAM Resizer might be:
+========== Example starts on next line ==========
+bamresize.exe filename.bam
+pause
+exit
+========== Example ends on previous line ========
+
+
+
+Usage:
+
+bamresize.exe [OPTIONS] filename.bam [filename2.bam...]
+
+
+Options:
+
+Option:	-h	or	--help
+Function:	Displays the help message.
+Example:	bamresize.exe -h	or	bamresize.exe --help
+
+Option:	-p PERCENT	or	--percentw PERCENT	or	--percentw=PERCENT
+Function:	Resize frame widths by PERCENT percent.  The default is 75 percent (3/4 of the original size).
+Example:	bamresize.exe -p 50	and	bamresize.exe --percentw 50	and	bamresize.exe --percentw=50 all resize the frame widths to 50 percent of the original.
+
+Option:	-q PERCENT	or	--percenth PERCENT	or	--percenth=PERCENT
+Function:	Resize frame heights by PERCENT percent.  The default is the value for -p / --percentw if specified, otherwise it is 75 percent.
+Example:	bamresize.exe -q 125	and	bamresize.exe --percenth 125	and	bamresize.exe --percenth=125 all resize the frame heights to 125 percent of the original.
+
+Option:	-x NUMBER	or	--modxoffset NUMBER	or	--modxoffset=NUMBER
+Function:	Modifies all frame X-Offsets (horizontal positions) by NUMBER.  NUMBER can be positive or negative.  The default is 0.
+Example:	bamresize.exe -x -20	and	bamresize.exe --modxoffset -20	and	bamresize.exe --modxoffset=-20 all decrease the frame X-Offsets by 20.  This shifts the frames 20 pixels to the right.
+
+Option:	-y NUMBER	or	--modyoffset NUMBER	or	--modyoffset=NUMBER
+Function:	Modifies all frame Y-Offsets (vertical positions) by NUMBER.  NUMBER can be positive or negative.  The default is 0.
+Example:	bamresize.exe -y 30	and	bamresize.exe --modyoffset 30	and	bamresize.exe --modyoffset=30 all increase the frame Y-Offsets by 30.  This shifts the frames 30 pixels up.
+
+Option:	-s NUMBER	or	--setxoffset NUMBER	or	--setxoffset=NUMBER
+Function:	Sets the frame X-Offsets (horizontal positions) to NUMBER.  NUMBER can be positive or negative.  The default is NONE (do not set).
+Example:	bamresize.exe -s 0	and	bamresize.exe --setxoffset 0	and	bamresize.exe --setxoffset=0 all set the frame X-Offsets to 0.
+
+Option:	-v NUMBER	or	--setyoffset NUMBER	or	--setyoffset=NUMBER
+Function:	Sets the frame Y-Offsets (vertical positions) to NUMBER.  NUMBER can be positive or negative.  The default is NONE (do not set).
+Example:	bamresize.exe -v -10	and	bamresize.exe --setyoffset -10	and	bamresize.exe --setyoffset=-10 all set the frame Y-Offsets to -10.
+
+Option:	-u VALUE	or	--unify VALUE	or	--unify=VALUE
+Function:	Pads the frames with rows and columns of transparent pixels to force all frames to have the same X-Offset, Y-Offset, Width, and Height.  This prevents the frames from appearing to twitch after being resized.  Accepted values for VALUE are 0 (do not unify), 1 (unify), and 2 (unify, but continue to pad the frames until they are square i.e. Width and Height are the same).  The default is 1 (unify).
+Example:	bamresize.exe -u 0	and	bamresize.exe --unify 0	and	bamresize.exe --unify=0 all explicitly disable the unify feature.
+	bamresize.exe -u 1	and	bamresize.exe --unify 1	and	bamresize.exe --unify=1 all explicitly enable the unify feature.  Explicitly enabling unify is unnecessary as it is enabled by default.
+	bamresize.exe -u 2	and	bamresize.exe --unify 2	and	bamresize.exe --unify=2 all explicitly enable the unify feature, plus the frame dimension will be further padded with transparent rows/columns until the dimensions are square.
+
+Option:	-t VALUE	or	--trim VALUE		or	--trim=VALUE
+Function:	Trims transparent padding (rows and columns of transparent pixels) from the frames after they are resized.  X and Y Offsets are adjusted accordingly.  This is the opposite of the unify feature.  If unify is set to 2 (make square), the final frames will not be trimmed, regardless of what value trim is set to.  Accepted values for VALUE are 0 (do not trim) and 1 (trim).  The default is 1 (trim).
+Example:	bamresize.exe -t 0	and	bamresize.exe --trim 0	and	bamresize.exe --trim=0 all explicitly disable the trim feature.
+	bamresize.exe -t 1	and	bamresize.exe --trim 1	and	bamresize.exe --trim=1 all explicitly enable the trim feature.  Explicitly enabling trim is unnecessary as it is enabled by default.
+
+Option:	-e FORMAT	or	--export FORMAT	or	--export=FORMAT
+Function:	Exports the frames in the basic format specified by FORMAT after all other processing of the frames is finished.  Examples of FORMAT include "bmp", "png", and "gif".  No frames are exported by default.
+Example:	bamresize.exe -e bmp	and	bamresize.exe --export bmp	and	bamresize.exe --export=bmp all export the final frames in the windows bitmap (.bmp) format.
+
+Option:	-d	or	--debug
+Function:	Displays some debug information.
+Example:	bamresize.exe -d filename.bam >filename_log.txt	or	bamresize.exe --debug filename.bam >filename_log.txt
+	This saves debug information to the file filename_log.txt.
+
+
+Filenames:
+
+Resizes all frames in filename.bam [filename2.bam...], applying all OPTIONS specified, and creating new files called filenamer.bam [filename2r.bam...]
+The filename(s) to convert can use wildcards.
+
+
+Order of Operations:
+Any of the above options may be specified with any other option, except for -h / --help which is mutually exclusive with all others.  The order in which the OPTIONS are passed to bamresizer does not matter.  The order that the options are applied is thus (assuming all options are enabled):  frames are unified (but not squared), frames are resized and dimensions and offsets are scaled accordingly, frames are trimmed if unify is not set to 2 (square) otherwise frames are squared, frame offsets are set to value specified, frame offsets are modified by value specified, and finally frames are exported in the format specified.  Debug information is generated throughout the process.
+
+
+Examples:
+
+bamresize.exe --help
+	Help message is displayed, then program exits.
+
+bamresize.exe filename.bam
+	Frames in filename.bam are unified, resized to 75% of original dimensions, trimmed, and saved to filenamer.bam
+
+bamresize.exe --percentw 50 --percenth 75 --unify 1 --trim 1 --setxoffset 25 --setyoffset -5 --modxoffset -5 --modyoffset 25 --export png --debug filename.bam >filename_log.txt
+	Frames in filename.bam are unified, frame widths are resized to 50%, frame heights are resized to 75%, frames are trimmed, frame X-Offsets are set to 25, frame Y-Offsets are set to -5, frame X-Offsets are decreased by 5, frame Y-Offsets are increased by 25, frames are exported to .png, and debug information is saved to filename_log.txt.
