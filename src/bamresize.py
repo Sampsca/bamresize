@@ -86,7 +86,7 @@ false = 0
 
 # ===========================================================================
 
-versionStr = "bamresize v2.8"
+versionStr = "bamresize v2.9"
 
 uStr = \
 """Code contributions by Avenger_teambg and Sam.
@@ -364,7 +364,10 @@ class BamFile (InfinityBaseFile):
 	    while lenData < nBytes:
 		byte = self.getByte()
 		if seenFlag:
-		    data += self.compressedChar * (byte+1)
+		    if len(data)+byte+1 > width*height:
+		        data += self.compressedChar * (width*height-len(data))
+		    else:
+		        data += self.compressedChar * (byte+1)
 		    lenData += byte+1
 		    seenFlag = false
 		    continue

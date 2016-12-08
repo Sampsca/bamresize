@@ -45,3 +45,6 @@ v2.8 (06 July 2015)
      * Fixed several more bugs in how input Options were processed, resulting in them being applied in a more logical order.
      * Added option to export frames in the basic format indicated by FORMAT:  ['-e FORMAT' or '--export FORMAT'] Examples include "bmp", "png", and "gif".  Default is do not export.
      * usage.txt documentation included.
+
+v2.9 (06 December 2016)
+     * Improved handling of corrupt RLE'd frame data.
